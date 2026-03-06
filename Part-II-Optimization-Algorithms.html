@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Memory Optimization: Seven Algorithms — Part II</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0d1117;--ink-s:#3d4451;--ink-m:#6e7787;
+  --bg:#f9f9f7;--sur:#ffffff;--bdr:#e8e8e4;
+  --teal:#0ea5a0;--teal-l:#e0f7f6;
+  --amber:#d97706;--amber-l:#fef3c7;
+  --indigo:#4f46e5;--indigo-l:#eef2ff;
+  --rose:#e11d48;--rose-l:#fff1f2;
+  --emerald:#059669;--emerald-l:#ecfdf5;
+  --violet:#7c3aed;--violet-l:#f5f3ff;
+  --orange:#ea580c;--orange-l:#fff7ed;
+  --sky:#0284c7;--sky-l:#e0f2fe;
+  --pink:#db2777;--pink-l:#fce7f3;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);line-height:1.7;overflow-x:hidden}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#0f1a2e 0%,#1a1040 50%,#0a1628 100%);padding:80px 24px 96px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 55% 45% at 80% 30%,rgba(124,58,237,.2) 0%,transparent 65%),radial-gradient(ellipse 45% 55% at 15% 65%,rgba(14,165,160,.15) 0%,transparent 65%);pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:48px 48px}
+.hero-inner{max-width:880px;margin:0 auto;position:relative;z-index:1}
+.h-breadcrumb{display:flex;align-items:center;gap:10px;margin-bottom:32px;flex-wrap:wrap}
+.bc-pill{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.bc-series{background:rgba(124,58,237,.18);border:1px solid rgba(124,58,237,.35);color:#c4b5fd}
+.bc-part{background:rgba(14,165,160,.15);border:1px solid rgba(14,165,160,.3);color:#5eead4}
+.bc-dot{color:rgba(255,255,255,.2);font-size:14px}
+.hero h1{font-family:'DM Serif Display',serif;font-size:clamp(32px,5.5vw,58px);line-height:1.1;letter-spacing:-.025em;color:#fff;margin-bottom:8px}
+.hero h1 em{font-style:italic;background:linear-gradient(135deg,#c4b5fd,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:18px;color:rgba(255,255,255,.6);font-weight:300;max-width:640px;margin-bottom:36px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:44px}
+.htag{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55)}
+.hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;max-width:600px}
+.stat{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:16px 20px}
+.stat-n{font-family:'DM Serif Display',serif;font-size:30px;color:#fff;line-height:1;margin-bottom:3px}
+.stat-l{font-size:11px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em}
+
+/* STICKY NAV */
+.prog-nav{background:var(--sur);border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:100;padding:0 24px}
+.prog-inner{max-width:880px;margin:0 auto;display:flex;gap:0;overflow-x:auto;scrollbar-width:none}
+.prog-inner::-webkit-scrollbar{display:none}
+.pn-item{flex-shrink:0;padding:14px 16px;font-size:12px;font-weight:600;color:var(--ink-m);cursor:pointer;border-bottom:2px solid transparent;transition:.2s;white-space:nowrap;text-decoration:none}
+.pn-item:hover,.pn-item.active{color:var(--violet);border-color:var(--violet)}
+
+/* BODY */
+.body-w{max-width:880px;margin:0 auto;padding:0 24px 80px}
+.sec{padding:60px 0 48px;border-bottom:1px solid var(--bdr)}
+.sec:last-child{border-bottom:none}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--violet);margin-bottom:18px}
+.eyebrow::after{content:'';display:block;width:28px;height:1px;background:var(--violet);opacity:.4}
+h2.stitle{font-family:'DM Serif Display',serif;font-size:clamp(26px,4vw,38px);line-height:1.15;letter-spacing:-.02em;margin-bottom:18px;color:var(--ink)}
+.lead{font-size:17px;color:var(--ink-s);line-height:1.8;max-width:780px}
+.lead strong{color:var(--ink);font-weight:600}
+.pullq{border-left:3px solid var(--violet);background:var(--violet-l);padding:20px 26px;border-radius:0 12px 12px 0;margin:28px 0;font-size:16px;color:var(--ink-s);font-style:italic}
+.pullq strong{color:var(--ink);font-style:normal}
+
+/* FAILURE MODE CALLOUTS */
+.fail3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:28px}
+.fm{border:1px solid var(--bdr);border-radius:13px;overflow:hidden;background:var(--sur)}
+.fm-hdr{padding:12px 18px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.fm1 .fm-hdr{background:var(--rose-l);color:var(--rose)}
+.fm2 .fm-hdr{background:var(--indigo-l);color:var(--indigo)}
+.fm3 .fm-hdr{background:var(--amber-l);color:var(--amber)}
+.fm-body{padding:16px 18px}
+.fm-title{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:8px}
+.fm-desc{font-size:13px;color:var(--ink-s);line-height:1.6}
+.fm-impact{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:600;padding:6px 10px;border-radius:6px}
+.fm1 .fm-impact{background:var(--rose-l);color:var(--rose)}.fm2 .fm-impact{background:var(--indigo-l);color:var(--indigo)}.fm3 .fm-impact{background:var(--amber-l);color:var(--amber)}
+
+/* TECHNIQUE CARDS */
+.tech-grid{display:flex;flex-direction:column;gap:32px;margin-top:36px}
+.tech-card{background:var(--sur);border:1px solid var(--bdr);border-radius:18px;overflow:hidden;transition:.2s;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.tech-card:hover{box-shadow:0 8px 32px rgba(0,0,0,.09)}
+.tc-header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0;padding:0}
+.tc-num{width:56px;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:22px;color:#fff;padding:24px 0;align-self:stretch}
+.tc-info{padding:20px 24px;border-left:1px solid rgba(255,255,255,.1)}
+.tc-algo{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#fff;margin-bottom:3px}
+.tc-subtitle{font-size:13px;color:rgba(255,255,255,.6);line-height:1.4}
+.tc-badges{display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding:20px 20px 20px 0}
+.tb{font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;white-space:nowrap}
+.paper-link{font-size:11px;color:rgba(255,255,255,.4);font-family:'JetBrains Mono',monospace;padding:0 20px 12px;text-decoration:none}
+.paper-link:hover{color:rgba(255,255,255,.7)}
+.tc-body{padding:24px;background:var(--bg)}
+.tc-body-inner{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:620px){.tc-body-inner{grid-template-columns:1fr}}
+.tc-section-title{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-m);margin-bottom:8px}
+.tc-text{font-size:14px;color:var(--ink-s);line-height:1.65}
+.tc-text strong{color:var(--ink)}
+.tc-metric{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--sur);border:1px solid var(--bdr);border-radius:8px;margin-bottom:8px}
+.tc-metric-label{font-size:13px;color:var(--ink-s)}
+.tc-metric-val{font-family:'DM Serif Display',serif;font-size:20px;font-weight:400;color:var(--ink)}
+.tc-metric.pos .tc-metric-val{color:var(--emerald)}
+.tc-metric.neg .tc-metric-val{color:var(--rose)}
+
+/* algorithm color theming */
+.raptor .tc-num{background:linear-gradient(135deg,#0ea5a0,#06b6d4)}
+.raptor .tc-info,.raptor .tc-badges{background:linear-gradient(135deg,#0d4a47,#0e6c67)}
+.hipporag .tc-num{background:linear-gradient(135deg,#7c3aed,#6d28d9)}
+.hipporag .tc-info,.hipporag .tc-badges{background:linear-gradient(135deg,#3b1f7a,#2e1065)}
+.reflexion .tc-num{background:linear-gradient(135deg,#e11d48,#be123c)}
+.reflexion .tc-info,.reflexion .tc-badges{background:linear-gradient(135deg,#7f1d3a,#4c0519)}
+.memgpt .tc-num{background:linear-gradient(135deg,#d97706,#b45309)}
+.memgpt .tc-info,.memgpt .tc-badges{background:linear-gradient(135deg,#78350f,#451a03)}
+.amem .tc-num{background:linear-gradient(135deg,#059669,#047857)}
+.amem .tc-info,.amem .tc-badges{background:linear-gradient(135deg,#064e3b,#022c22)}
+.zep .tc-num{background:linear-gradient(135deg,#0284c7,#0369a1)}
+.zep .tc-info,.zep .tc-badges{background:linear-gradient(135deg,#0c4a6e,#082f49)}
+.memoryr1 .tc-num{background:linear-gradient(135deg,#db2777,#be185d)}
+.memoryr1 .tc-info,.memoryr1 .tc-badges{background:linear-gradient(135deg,#831843,#500724)}
+
+/* CODE BLOCKS */
+.code-block{background:#0f1923;border-radius:13px;overflow:hidden;margin:16px 0;box-shadow:0 3px 16px rgba(0,0,0,.14)}
+.cb-hdr{padding:11px 18px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between}
+.cb-dots{display:flex;gap:6px}.cbd{width:10px;height:10px;border-radius:50%}
+.cb-lang{font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,.3);letter-spacing:.06em;text-transform:uppercase}
+.cb-body{padding:18px;overflow-x:auto}
+pre{font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;color:#e2e8f0}
+.kw{color:#c084fc}.fn{color:#60a5fa}.str{color:#86efac}.cmt{color:#475569}.op{color:#fb7185}.num{color:#fbbf24}
+
+/* PROACTIVE REACTIVE */
+.pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:28px;border:1px solid var(--bdr);border-radius:14px;overflow:hidden}
+@media(max-width:560px){.pr-grid{grid-template-columns:1fr}}
+.pr-col{padding:24px}
+.pr-col:first-child{border-right:1px solid var(--bdr)}
+.pr-hdr{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:12px 18px;margin:-24px -24px 18px}
+.pr-col.proactive .pr-hdr{background:linear-gradient(90deg,#ecfdf5,#d1fae5);color:#065f46}
+.pr-col.reactive .pr-hdr{background:linear-gradient(90deg,#eff6ff,#dbeafe);color:#1e3a8a}
+.pr-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;font-size:13px;color:var(--ink-s);line-height:1.55}
+.pr-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:7px}
+.proactive .pr-dot{background:var(--emerald)}.reactive .pr-dot{background:var(--indigo)}
+.pr-strong{font-weight:700;color:var(--ink);font-size:13px;display:block;margin-bottom:3px}
+
+/* FULL STACK DIAGRAM */
+.stack-diagram{background:var(--ink);border-radius:16px;overflow:hidden;margin-top:28px}
+.sd-hdr{padding:14px 24px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,.3);letter-spacing:.08em;text-transform:uppercase}
+.sd-body{padding:24px}
+.sd-phase{margin-bottom:20px}
+.sd-phase:last-child{margin-bottom:0}
+.sd-phase-title{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px;padding:6px 14px;border-radius:6px;display:inline-block}
+.sdt-ing{background:rgba(14,165,160,.15);color:#5eead4}
+.sdt-ret{background:rgba(124,58,237,.15);color:#c4b5fd}
+.sdt-con{background:rgba(234,88,12,.15);color:#fdba74}
+.sd-items{display:flex;flex-wrap:wrap;gap:8px}
+.sd-item{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 14px;font-size:12px;color:rgba(255,255,255,.7)}
+.sd-tag{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:2px}
+.tag-r{background:rgba(14,165,160,.2);color:#2dd4bf}
+.tag-h{background:rgba(124,58,237,.2);color:#c4b5fd}
+.tag-a{background:rgba(5,150,105,.2);color:#6ee7b7}
+.tag-z{background:rgba(2,132,199,.2);color:#7dd3fc}
+.tag-m{background:rgba(219,39,119,.2);color:#f9a8d4}
+.tag-re{background:rgba(225,29,72,.2);color:#fda4af}
+.tag-4{background:rgba(217,119,6,.2);color:#fcd34d}
+.tag-g{background:rgba(255,255,255,.08);color:rgba(255,255,255,.5)}
+
+/* SELECTION MATRIX */
+.matrix-w{margin-top:28px;overflow-x:auto;border:1px solid var(--bdr);border-radius:14px}
+.matrix{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
+.matrix th{padding:11px 14px;background:var(--bg);border-bottom:1px solid var(--bdr);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-m);white-space:nowrap;text-align:center}
+.matrix th:first-child{text-align:left}
+.matrix td{padding:10px 14px;border-bottom:1px solid #f3f4f6;text-align:center;vertical-align:middle}
+.matrix tr:last-child td{border-bottom:none}
+.matrix td:first-child{text-align:left;font-weight:700;color:var(--ink)}
+.matrix tr:hover td{background:#fafafa}
+.mx-ex{color:var(--emerald);font-size:15px}.mx-no{color:var(--rose);font-size:15px}.mx-pa{color:var(--amber);font-size:15px}.mx-na{color:var(--ink-m);font-size:13px}
+
+/* PRINCIPLES */
+.principles{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:28px}
+.pc{display:flex;gap:16px;padding:22px;background:var(--sur);border:1px solid var(--bdr);border-radius:13px;transition:.2s}
+.pc:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,.07)}
+.pc-n{font-family:'DM Serif Display',serif;font-size:38px;line-height:1;color:#e2e8f0;flex-shrink:0;margin-top:-3px}
+.pc-title{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:5px}
+.pc-body{font-size:13px;color:var(--ink-s);line-height:1.65}
+
+/* FOOTER */
+.footer-nav{background:linear-gradient(135deg,#0f1a2e,#1a1040);padding:56px 24px;text-align:center}
+.footer-nav h3{font-family:'DM Serif Display',serif;font-size:30px;color:#fff;margin-bottom:10px}
+.footer-nav p{color:rgba(255,255,255,.5);font-size:15px;margin-bottom:28px}
+.fnav-btns{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+.fb{display:inline-flex;align-items:center;gap:7px;padding:12px 24px;border-radius:9px;font-size:14px;font-weight:600;text-decoration:none;border:none;cursor:pointer;transition:.15s}
+.fb:hover{opacity:.88;transform:translateY(-1px)}
+.fb-pri{background:var(--violet);color:#fff}.fb-sec{background:rgba(255,255,255,.09);color:#fff;border:1px solid rgba(255,255,255,.18)}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="h-breadcrumb">
+      <span class="bc-pill bc-series">Agentic AI Memory Series</span>
+      <span class="bc-dot">›</span>
+      <span class="bc-pill bc-part">Part II of III</span>
+    </div>
+    <h1>Agent Memory Optimization:<br><em>Seven Algorithms</em></h1>
+    <p class="hero-sub">From RAPTOR Hierarchical Trees to RL-Trained Policy Learning — The Complete Implementation Playbook</p>
+    <div class="hero-tags">
+      <span class="htag">RAPTOR</span><span class="htag">HippoRAG</span><span class="htag">Reflexion</span><span class="htag">MemGPT</span><span class="htag">A-Mem</span><span class="htag">Zep</span><span class="htag">Memory-R1</span>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-n">7</div><div class="stat-l">Algorithms</div></div>
+      <div class="stat"><div class="stat-n">−90%</div><div class="stat-l">Token Cost (A-Mem)</div></div>
+      <div class="stat"><div class="stat-n">+10.9pp</div><div class="stat-l">HumanEval (Reflexion)</div></div>
+      <div class="stat"><div class="stat-n">2025</div><div class="stat-l">Memory-R1 RL</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- STICKY NAV -->
+<nav class="prog-nav">
+  <div class="prog-inner">
+    <a class="pn-item active" href="#overview">Overview</a>
+    <a class="pn-item" href="#failures">RAG Failures</a>
+    <a class="pn-item" href="#raptor">RAPTOR</a>
+    <a class="pn-item" href="#hipporag">HippoRAG</a>
+    <a class="pn-item" href="#reflexion">Reflexion</a>
+    <a class="pn-item" href="#memgpt">MemGPT</a>
+    <a class="pn-item" href="#amem">A-Mem</a>
+    <a class="pn-item" href="#zep">Zep</a>
+    <a class="pn-item" href="#memoryr1">Memory-R1</a>
+    <a class="pn-item" href="#retrieval">Retrieval</a>
+    <a class="pn-item" href="#matrix">Selection</a>
+  </div>
+</nav>
+
+<div class="body-w">
+
+<!-- OVERVIEW -->
+<section class="sec" id="overview">
+  <div class="eyebrow">Part II Overview</div>
+  <h2 class="stitle">Why Algorithms, Not Just Architecture</h2>
+  <p class="lead">Part I established foundations: six-layer taxonomy, hot/cold separation, and the extract → consolidate pipeline. Part II addresses the harder question: <strong>which algorithms make each layer perform at production quality?</strong></p>
+  <div class="pullq"><strong>Core insight:</strong> Flat vector retrieval with top-k ANN search fails predictably on three problem classes that most production agents encounter: multi-hop relational queries, hierarchical abstraction queries, and time-sensitive fact retrieval. Each of the seven techniques below was designed to address one or more of these failure modes precisely.</div>
+</section>
+
+<!-- RAG FAILURES -->
+<section class="sec" id="failures">
+  <div class="eyebrow">Why Naive RAG Fails</div>
+  <h2 class="stitle">Three Structural Failure Modes at Scale</h2>
+  <div class="fail3">
+    <div class="fm fm1">
+      <div class="fm-hdr">Failure 1 · Retrieval Precision Collapse</div>
+      <div class="fm-body">
+        <div class="fm-title">Similar ≠ Relevant</div>
+        <div class="fm-desc">Query "Q4 revenue target" returns Q3 results, HR targets, competitor analysis — all with high cosine similarity. Agent generates confident answer from wrong sources.</div>
+        <div class="fm-impact">🔴 Critical — undetectable without source audit</div>
+      </div>
+    </div>
+    <div class="fm fm2">
+      <div class="fm-hdr">Failure 2 · Multi-Hop Blindness</div>
+      <div class="fm-body">
+        <div class="fm-title">Structural Impossibility</div>
+        <div class="fm-desc">"Who approved Sarah's budget?" requires: Sarah → [leads] → Project Atlas → [has_budget] → approved_by → CFO. ANN finds independent documents — not the chain. This is structural, not a tuning problem.</div>
+        <div class="fm-impact">🔴 Critical — entire query class cannot be answered</div>
+      </div>
+    </div>
+    <div class="fm fm3">
+      <div class="fm-hdr">Failure 3 · Token Cost Explosion</div>
+      <div class="fm-body">
+        <div class="fm-title">top-k=20 → ~16,900 tokens</div>
+        <div class="fm-desc">Common mitigation "retrieve more" leads to massive context overhead. A-Mem benchmark shows same task class achievable in ~1,700 tokens — a 90% cost reduction from architecture alone.</div>
+        <div class="fm-impact">💸 Expensive — compounds at production volumes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SEVEN ALGORITHMS -->
+<section class="sec" id="raptor">
+  <div class="eyebrow">Seven Algorithms</div>
+  <h2 class="stitle">Technique 1 · RAPTOR</h2>
+  <div class="tech-grid">
+    <div class="tech-card raptor">
+      <div class="tc-header">
+        <div class="tc-num">1</div>
+        <div class="tc-info">
+          <div class="tc-algo">RAPTOR — Recursive Abstractive Processing for Tree-Organized Retrieval</div>
+          <div class="tc-subtitle">Hierarchical summarization trees for multi-abstraction retrieval</div>
+        </div>
+        <div class="tc-badges">
+          <span class="tb" style="background:rgba(14,165,160,.2);color:#5eead4">ICLR 2024</span>
+          <span class="tb" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Sarthi et al.</span>
+        </div>
+      </div>
+      <a class="paper-link" href="https://arxiv.org/pdf/2401.18059.pdf" target="_blank">→ arXiv:2401.18059</a>
+      <div class="tc-body">
+        <div class="tc-body-inner">
+          <div>
+            <div class="tc-section-title">Problem Solved</div>
+            <div class="tc-text">Flat vector stores force every query to retrieve at a single level of granularity. Broad strategic queries need high-level synthesis. Specific queries need raw source detail. One flat index serves neither well.</div>
+            <br>
+            <div class="tc-section-title">How It Works</div>
+            <div class="tc-text">Build a tree of progressively abstracted summaries. <strong>Level 0:</strong> raw chunks. <strong>Level 1:</strong> cluster summaries (GMM clustering, not k-means — because content spans multiple semantic domains). <strong>Level 2+:</strong> re-cluster and summarize recursively. All levels coexist in one flat index. Queries naturally match their appropriate abstraction level.</div>
+            <br>
+            <div class="tc-section-title">Why GMM, not k-means?</div>
+            <div class="tc-text">A chunk about "OAuth security" belongs to both Auth Flows and Security clusters simultaneously. Hard k-means forces incorrect exclusive assignment. Gaussian Mixture Models support soft membership.</div>
+          </div>
+          <div>
+            <div class="tc-section-title">Architecture</div>
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:16px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:2;color:var(--ink-s)">
+              <div style="color:#0ea5a0;font-weight:700">LEVEL 2 (Root)</div>
+              <div>└─ Full Auth Architecture Summary ← Broad Q</div>
+              <div style="padding-left:16px;color:#0ea5a0;font-weight:700">LEVEL 1</div>
+              <div style="padding-left:16px">├─ Auth Flow Summary</div>
+              <div style="padding-left:16px">└─ Token Mgmt Summary</div>
+              <div style="padding-left:32px;color:#0ea5a0;font-weight:700">LEVEL 0 (Leaves)</div>
+              <div style="padding-left:32px">[OAuth][Auth0][PKCE]  ← Specific Q</div>
+              <div style="padding-left:32px">[JWT][Refresh][Session]</div>
+            </div>
+            <br>
+            <div class="tc-section-title">Best For</div>
+            <div class="tc-text">Hierarchically organized document corpora. Technical documentation, legal/policy archives, clinical guidelines — any corpus with natural abstraction levels.</div>
+            <div class="tc-metric" style="margin-top:12px"><span class="tc-metric-label">Multi-hop support</span><span class="tc-metric-val" style="color:var(--amber)">⚠ Limited</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">Token overhead</span><span class="tc-metric-val pos">Low</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="hipporag">
+  <h2 class="stitle">Technique 2 · HippoRAG</h2>
+  <div class="tech-grid">
+    <div class="tech-card hipporag">
+      <div class="tc-header">
+        <div class="tc-num">2</div>
+        <div class="tc-info">
+          <div class="tc-algo">HippoRAG — Hippocampus-Inspired Knowledge Graph Retrieval</div>
+          <div class="tc-subtitle">PersonalizedPageRank over entity graph for multi-hop queries</div>
+        </div>
+        <div class="tc-badges">
+          <span class="tb" style="background:rgba(124,58,237,.25);color:#c4b5fd">arXiv 2024</span>
+          <span class="tb" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Gutierrez et al.</span>
+        </div>
+      </div>
+      <a class="paper-link" href="https://arxiv.org/pdf/2405.14831.pdf" target="_blank">→ arXiv:2405.14831</a>
+      <div class="tc-body">
+        <div class="tc-body-inner">
+          <div>
+            <div class="tc-section-title">Neurological Inspiration</div>
+            <div class="tc-text">The hippocampus uses pattern-separated representations for individual memory components while the neocortex integrates them into semantic understanding. HippoRAG mirrors this: <strong>extract entities and triples → build KG → use PersonalizedPageRank to traverse entity neighborhoods.</strong></div>
+            <br>
+            <div class="tc-section-title">Retrieval Mechanism</div>
+            <div class="tc-text">Instead of finding "most similar chunk," HippoRAG finds the most relevant entity neighborhood. Query → identify seed entities via ANN → run PPR from seeds → retrieve all chunks in activated neighborhood. Resolves the "Sarah → budget → CFO" chain structurally.</div>
+          </div>
+          <div>
+            <div class="tc-section-title">When to Use</div>
+            <div class="tc-text">Entity-rich knowledge bases where relationships matter. Healthcare (patient → diagnosis → treatment → contraindication), financial (entity → ownership → approval chain), enterprise (person → role → project → decision).</div>
+            <br>
+            <div class="tc-section-title">Build Cost</div>
+            <div class="tc-text">High — requires entity extraction pipeline, triple generation, and KG maintenance. KG must be kept synchronized with source corpus.</div>
+            <div class="tc-metric" style="margin-top:12px"><span class="tc-metric-label">Multi-hop support</span><span class="tc-metric-val pos">✓ Excellent</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">Build cost</span><span class="tc-metric-val neg">High</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="reflexion">
+  <h2 class="stitle">Technique 3 · Reflexion</h2>
+  <div class="tech-grid">
+    <div class="tech-card reflexion">
+      <div class="tc-header">
+        <div class="tc-num">3</div>
+        <div class="tc-info">
+          <div class="tc-algo">Reflexion — Episodic Failure Memory for Agent Self-Improvement</div>
+          <div class="tc-subtitle">Memory as a learning mechanism: +10.9pp HumanEval with zero weight updates</div>
+        </div>
+        <div class="tc-badges">
+          <span class="tb" style="background:rgba(225,29,72,.25);color:#fda4af">NeurIPS 2023</span>
+          <span class="tb" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Shinn et al.</span>
+        </div>
+      </div>
+      <a class="paper-link" href="https://arxiv.org/pdf/2303.11366.pdf" target="_blank">→ arXiv:2303.11366</a>
+      <div class="tc-body">
+        <div class="tc-body-inner">
+          <div>
+            <div class="tc-section-title">Core Insight</div>
+            <div class="tc-text">Memory is not just a lookup mechanism — it is a <strong>learning mechanism.</strong> When a task fails, Reflexion stores a structured episodic reflection: what the agent attempted, what failed, and what constraint was violated. On the next attempt for similar tasks, the reflection is retrieved and injected into context. The agent learns from failure without gradient updates.</div>
+            <br>
+            <div class="tc-section-title">Published Results</div>
+            <div class="tc-metric"><span class="tc-metric-label">HumanEval (coding)</span><span class="tc-metric-val pos">80.1% → 91.0%</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">AlfWorld (embodied)</span><span class="tc-metric-val pos">75% → 97%</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">Weight updates required</span><span class="tc-metric-val pos">Zero</span></div>
+          </div>
+          <div>
+            <div class="tc-section-title">Reflection Structure</div>
+            <div class="code-block" style="margin:0">
+              <div class="cb-hdr"><div class="cb-dots"><div class="cbd" style="background:#ff5f57"></div><div class="cbd" style="background:#febc2e"></div><div class="cbd" style="background:#28c840"></div></div><div class="cb-lang">Python</div></div>
+              <div class="cb-body"><pre>{
+  <span class="str">"task_type"</span>: <span class="str">"oauth_implementation"</span>,
+  <span class="str">"attempt_summary"</span>: <span class="str">"Used implicit flow..."</span>,
+  <span class="str">"failure_reason"</span>: <span class="str">"Missing PKCE verifier"</span>,
+  <span class="str">"constraint_violated"</span>: <span class="str">"RFC 7636 §4.2"</span>,
+  <span class="str">"corrective_insight"</span>: <span class="str">"Always generate code_verifier before redirect"</span>,
+  <span class="str">"timestamp"</span>: <span class="str">"2024-09-14T11:22:00Z"</span>
+}</pre></div>
+            </div>
+            <br>
+            <div class="tc-section-title">Best For</div>
+            <div class="tc-text">Any agent that retries tasks: coding agents, agentic QA, tool-use agents. Low build cost — just structured failure logging with retrieval.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="memgpt">
+  <h2 class="stitle">Technique 4 · MemGPT</h2>
+  <div class="tech-grid">
+    <div class="tech-card memgpt">
+      <div class="tc-header">
+        <div class="tc-num">4</div>
+        <div class="tc-info">
+          <div class="tc-algo">MemGPT — OS-Inspired Virtual Context Management</div>
+          <div class="tc-subtitle">Fast/slow memory tiers + interrupts for multi-session conversational agents</div>
+        </div>
+        <div class="tc-badges">
+          <span class="tb" style="background:rgba(217,119,6,.25);color:#fcd34d">UC Berkeley</span>
+          <span class="tb" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Packer et al.</span>
+        </div>
+      </div>
+      <a class="paper-link" href="https://arxiv.org/pdf/2310.08560.pdf" target="_blank">→ arXiv:2310.08560</a>
+      <div class="tc-body">
+        <div class="tc-body-inner">
+          <div>
+            <div class="tc-section-title">OS Analogy</div>
+            <div class="tc-text"><strong>Context window = RAM (limited, fast).</strong> External memory = disk (unlimited, slower). MemGPT implements "paging": when context fills, intelligently evict lower-priority content to disk and load higher-priority content. An interrupt mechanism allows the model to trigger memory operations during inference.</div>
+            <br>
+            <div class="tc-section-title">Memory Tiers</div>
+            <div style="font-size:13px;color:var(--ink-s);line-height:1.7">
+              <div><strong style="color:var(--ink)">Core memory:</strong> Critical system context + user persona — always in context</div>
+              <div><strong style="color:var(--ink)">Recall memory:</strong> Recent conversation history — searchable episodic store</div>
+              <div><strong style="color:var(--ink)">Archival memory:</strong> Long-term persistent storage — vector search</div>
+            </div>
+          </div>
+          <div>
+            <div class="tc-section-title">Self-Editing Interface</div>
+            <div class="tc-text">The LLM itself calls memory functions: <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">memory_insert()</code>, <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">memory_search()</code>, <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">memory_replace()</code>. This is the direct precursor to today's Memory-as-a-Tool pattern.</div>
+            <br>
+            <div class="tc-section-title">Best For</div>
+            <div class="tc-text">Multi-session conversational agents where continuity across sessions matters. Customer service, personal assistants, long-running project co-pilots.</div>
+            <div class="tc-metric" style="margin-top:12px"><span class="tc-metric-label">Token overhead</span><span class="tc-metric-val neg">High (~16,900)</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">Build cost</span><span class="tc-metric-val pos">Low</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="amem">
+  <h2 class="stitle">Technique 5 · A-Mem</h2>
+  <div class="tech-grid">
+    <div class="tech-card amem">
+      <div class="tc-header">
+        <div class="tc-num">5</div>
+        <div class="tc-info">
+          <div class="tc-algo">A-Mem — Agentic Memory with Zettelkasten Dynamic Networks</div>
+          <div class="tc-subtitle">−90% token overhead · +145% multi-hop ROUGE-L accuracy</div>
+        </div>
+        <div class="tc-badges">
+          <span class="tb" style="background:rgba(5,150,105,.25);color:#6ee7b7">arXiv 2025</span>
+          <span class="tb" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Xu et al.</span>
+        </div>
+      </div>
+      <a class="paper-link" href="https://arxiv.org/abs/2502.12110" target="_blank">→ arXiv:2502.12110</a>
+      <div class="tc-body">
+        <div class="tc-body-inner">
+          <div>
+            <div class="tc-section-title">Zettelkasten Insight</div>
+            <div class="tc-text">Inspired by the Zettelkasten note-taking method: every memory is an atomic note with typed links to related notes. Each note contains: keyword index, context, category, and links. Retrieval traverses the network — no need to over-retrieve for coverage.</div>
+            <br>
+            <div class="tc-section-title">Dynamic Evolution</div>
+            <div class="tc-text">Notes evolve as new information arrives. A note on "OAuth preferences" links to notes on "security requirements," "current project," and "tooling decisions." The network grows richer over time. No static chunking required.</div>
+          </div>
+          <div>
+            <div class="tc-section-title">Benchmark Results</div>
+            <div class="tc-metric"><span class="tc-metric-label">Multi-hop ROUGE-L</span><span class="tc-metric-val pos">18.09 → 44.27</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">Token overhead</span><span class="tc-metric-val pos">~1,700 avg</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">vs. MemGPT baseline</span><span class="tc-metric-val pos">−90% tokens</span></div>
+            <br>
+            <div class="tc-section-title">Key Finding</div>
+            <div class="tc-text"><strong>Architectural soundness and token efficiency are aligned.</strong> The +145% accuracy improvement with −90% cost reduction is the clearest evidence that correct memory architecture reduces both cost and error simultaneously.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="zep">
+  <h2 class="stitle">Technique 6 · Zep</h2>
+  <div class="tech-grid">
+    <div class="tech-card zep">
+      <div class="tc-header">
+        <div class="tc-num">6</div>
+        <div class="tc-info">
+          <div class="tc-algo">Zep — Bi-Temporal Knowledge Graphs for Time-Aware Memory</div>
+          <div class="tc-subtitle">valid_at + recorded_at dual timestamps — the production solution to memory staleness</div>
+        </div>
+        <div class="tc-badges">
+          <span class="tb" style="background:rgba(2,132,199,.25);color:#7dd3fc">arXiv 2025</span>
+          <span class="tb" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Rasmussen et al.</span>
+        </div>
+      </div>
+      <a class="paper-link" href="https://arxiv.org/pdf/2501.13956.pdf" target="_blank">→ arXiv:2501.13956</a>
+      <div class="tc-body">
+        <div class="tc-body-inner">
+          <div>
+            <div class="tc-section-title">The Temporal Problem</div>
+            <div class="tc-text">Standard memory stores have one timestamp: when was this created? But temporal queries need two: <strong>When was this fact true in the world?</strong> (valid_at) vs. <strong>When did we learn about it?</strong> (recorded_at). Without both, queries like "What was the policy as of March 2024?" are impossible to answer correctly.</div>
+            <br>
+            <div class="tc-section-title">Bi-Temporal Schema</div>
+            <div class="code-block" style="margin:0">
+              <div class="cb-hdr"><div class="cb-dots"><div class="cbd" style="background:#ff5f57"></div><div class="cbd" style="background:#febc2e"></div><div class="cbd" style="background:#28c840"></div></div><div class="cb-lang">SQL</div></div>
+              <div class="cb-body"><pre><span class="kw">SELECT</span> fact, source, confidence
+<span class="kw">FROM</span> memory
+<span class="kw">WHERE</span> valid_at <span class="op">&lt;=</span> <span class="str">'2024-03-01'</span>
+  <span class="kw">AND</span> (valid_to <span class="kw">IS NULL</span>
+       <span class="kw">OR</span> valid_to <span class="op">&gt;</span> <span class="str">'2024-03-01'</span>)
+  <span class="kw">AND</span> recorded_at <span class="op">&lt;=</span> NOW()</pre></div>
+            </div>
+          </div>
+          <div>
+            <div class="tc-section-title">Lifecycle Operations</div>
+            <div class="tc-text"><strong>New fact arrives:</strong> INSERT with valid_from = NOW(), valid_to = NULL.<br><strong>Fact superseded:</strong> UPDATE prior record valid_to = NOW(), INSERT new record.<br><strong>Historical query:</strong> Filter WHERE valid_at = target_date.</div>
+            <br>
+            <div class="tc-section-title">Domain Fit</div>
+            <div class="tc-text">Required for healthcare (drug doses change), finance (earnings data by quarter), enterprise (org structure, policies). Any domain where "stale memory" has meaningful consequences.</div>
+            <div class="tc-metric" style="margin-top:12px"><span class="tc-metric-label">Temporal support</span><span class="tc-metric-val pos">✓ Full</span></div>
+            <div class="tc-metric"><span class="tc-metric-label">Multi-hop</span><span class="tc-metric-val pos">✓ Good</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="memoryr1">
+  <h2 class="stitle">Technique 7 · Memory-R1</h2>
+  <div class="tech-grid">
+    <div class="tech-card memoryr1">
+      <div class="tc-header">
+        <div class="tc-num">7</div>
+        <div class="tc-info">
+          <div class="tc-algo">Memory-R1 — RL-Trained Memory Management Policy (2025)</div>
+          <div class="tc-subtitle">ADD / UPDATE / DELETE / NOOP — learned ops replacing heuristic consolidation</div>
+        </div>
+        <div class="tc-badges">
+          <span class="tb" style="background:rgba(219,39,119,.25);color:#f9a8d4">arXiv 2025 🆕</span>
+          <span class="tb" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Yan et al.</span>
+        </div>
+      </div>
+      <a class="paper-link" href="https://arxiv.org/abs/2508.19828" target="_blank">→ arXiv:2508.19828</a>
+      <div class="tc-body">
+        <div class="tc-body-inner">
+          <div>
+            <div class="tc-section-title">The RL Breakthrough</div>
+            <div class="tc-text">All prior consolidation systems use heuristics: similarity thresholds, recency rules, importance scores. Memory-R1 trains a <strong>Memory Manager policy</strong> via reinforcement learning to decide ADD/UPDATE/DELETE/NOOP for each candidate memory — optimizing directly for downstream task performance. The policy generalizes across benchmarks without domain-specific tuning.</div>
+            <br>
+            <div class="tc-section-title">Two-Agent Architecture</div>
+            <div class="tc-text"><strong>Memory Manager:</strong> trained to maintain high-quality memory state via RL. <strong>Answer Agent:</strong> retrieves from curated memory and answers queries. Memory Manager is rewarded when Answer Agent improves. Reward is downstream task performance — not a proxy metric.</div>
+          </div>
+          <div>
+            <div class="tc-section-title">Action Space</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+              <div style="background:var(--emerald-l);border:1px solid #6ee7b7;border-radius:8px;padding:10px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--emerald)">ADD</div><div style="font-size:11px;color:var(--ink-s);margin-top:4px">New fact, novel info</div></div>
+              <div style="background:var(--amber-l);border:1px solid #fcd34d;border-radius:8px;padding:10px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--amber)">UPDATE</div><div style="font-size:11px;color:var(--ink-s);margin-top:4px">Changed or corrected</div></div>
+              <div style="background:var(--rose-l);border:1px solid #fda4af;border-radius:8px;padding:10px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--rose)">DELETE</div><div style="font-size:11px;color:var(--ink-s);margin-top:4px">Stale or contradicted</div></div>
+              <div style="background:var(--bg);border:1px solid var(--bdr);border-radius:8px;padding:10px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--ink-m)">NOOP</div><div style="font-size:11px;color:var(--ink-s);margin-top:4px">Already known</div></div>
+            </div>
+            <div class="tc-section-title">Field Trajectory</div>
+            <div class="tc-text">Memory-R1 defines the trajectory: learned policies will replace heuristics within 2–3 years. <strong>Design your consolidation pipeline against this ADD/UPDATE/DELETE/NOOP abstraction today</strong> to enable migration when RL policies reach production maturity.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RETRIEVAL STRATEGY -->
+<section class="sec" id="retrieval">
+  <div class="eyebrow">Retrieval Architecture</div>
+  <h2 class="stitle">Proactive vs. Reactive: The Production Pattern</h2>
+  <p class="lead">Neither proactive-only nor reactive-only retrieval is optimal at production scale. The correct pattern is a hybrid: small proactive retrieval for high-value always-relevant context, plus reactive tool calls for deep archives.</p>
+  <div class="pr-grid">
+    <div class="pr-col proactive">
+      <div class="pr-hdr">🟢 Proactive Retrieval — Every Turn</div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Structured user profile</span>Always inject — highest-priority, lowest-token-cost signal</div></div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Top-3 episodic memories</span>4-factor scored, cached importance — predictable latency</div></div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Active task constraints</span>Current project context, active decisions, blockers</div></div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Cost: minimal</span>Small, deterministic, pre-fetched during session load</div></div>
+    </div>
+    <div class="pr-col reactive">
+      <div class="pr-hdr">🔵 Reactive Retrieval — Memory-as-a-Tool</div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Agent identifies gap</span>LLM calls memory search tool when context insufficient</div></div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Deep archive search</span>RAPTOR trees, HippoRAG PPR, A-Mem network traversal</div></div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Temporal filters</span>Zep bi-temporal queries, staleness validation</div></div>
+      <div class="pr-item"><div class="pr-dot"></div><div><span class="pr-strong">Hybrid fusion</span>Dense + BM25 + KG → Reciprocal Rank Fusion → reranker</div></div>
+    </div>
+  </div>
+  <br>
+  <div class="stack-diagram">
+    <div class="sd-hdr"><span>⚙</span> full-optimized-memory-stack.architecture</div>
+    <div class="sd-body">
+      <div class="sd-phase">
+        <div class="sd-phase-title sdt-ing">Ingestion Pipeline (async cold path)</div>
+        <div class="sd-items">
+          <div class="sd-item"><span class="sd-tag tag-r">RAPTOR</span> Chunk + update summarization tree</div>
+          <div class="sd-item"><span class="sd-tag tag-a">A-Mem</span> Generate atomic note + discover typed links</div>
+          <div class="sd-item"><span class="sd-tag tag-h">HippoRAG</span> Extract triples + update KG bipartite index</div>
+          <div class="sd-item"><span class="sd-tag tag-z">Zep</span> Tag valid_from + confidence + decay_rate</div>
+          <div class="sd-item"><span class="sd-tag tag-4">4-Factor</span> Score importance 1–10 (cached at write time)</div>
+        </div>
+      </div>
+      <div class="sd-phase">
+        <div class="sd-phase-title sdt-ret">Retrieval Pipeline (hot path + reactive tool)</div>
+        <div class="sd-items">
+          <div class="sd-item"><span class="sd-tag tag-r">RAPTOR</span> Abstraction-level matched retrieval</div>
+          <div class="sd-item"><span class="sd-tag tag-h">HippoRAG</span> PPR entity traversal</div>
+          <div class="sd-item"><span class="sd-tag tag-a">A-Mem</span> Network expansion via typed note links</div>
+          <div class="sd-item"><span class="sd-tag tag-z">Zep</span> Temporal validity filter + decay scoring</div>
+          <div class="sd-item"><span class="sd-tag tag-g">RRF</span> Reciprocal Rank Fusion → cross-encoder reranking → top-5</div>
+        </div>
+      </div>
+      <div class="sd-phase">
+        <div class="sd-phase-title sdt-con">Consolidation Pipeline (async ~30 min)</div>
+        <div class="sd-items">
+          <div class="sd-item"><span class="sd-tag tag-m">Memory-R1</span> ADD/UPDATE/DELETE/NOOP decisions</div>
+          <div class="sd-item"><span class="sd-tag tag-re">Reflexion</span> Extract failure lessons → episodic store</div>
+          <div class="sd-item"><span class="sd-tag tag-z">Zep</span> Close expired temporal facts</div>
+          <div class="sd-item"><span class="sd-tag tag-r">RAPTOR</span> Trigger tree rebuild if corpus Δ &gt; 15%</div>
+          <div class="sd-item"><span class="sd-tag tag-g">Gov</span> TTL enforcement · PII sweep · audit log</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SELECTION MATRIX -->
+<section class="sec" id="matrix">
+  <div class="eyebrow">Technique Selection</div>
+  <h2 class="stitle">Technique Selection Matrix</h2>
+  <p class="lead">Use this matrix to select the right techniques for your use case. Production systems typically compose 3–4 techniques, not just one.</p>
+  <div class="matrix-w">
+    <table class="matrix">
+      <thead><tr><th>Technique</th><th>Multi-Hop</th><th>Temporal</th><th>Token Cost</th><th>Build Cost</th><th>Primary Use Case</th></tr></thead>
+      <tbody>
+        <tr><td>Standard RAG</td><td><span class="mx-no">✗</span></td><td><span class="mx-no">✗</span></td><td>Low</td><td>Low</td><td>Simple document QA</td></tr>
+        <tr><td><strong>RAPTOR</strong></td><td><span class="mx-pa">⚠</span></td><td><span class="mx-no">✗</span></td><td>Low</td><td>High</td><td>Hierarchical document corpora</td></tr>
+        <tr><td><strong>HippoRAG</strong></td><td><span class="mx-ex">✓</span></td><td><span class="mx-no">✗</span></td><td>Med</td><td>High</td><td>Entity-rich knowledge bases</td></tr>
+        <tr><td><strong>Reflexion</strong></td><td><span class="mx-na">N/A</span></td><td><span class="mx-pa">⚠</span></td><td>Low</td><td>Low</td><td>Task-retry learning agents</td></tr>
+        <tr><td><strong>MemGPT</strong></td><td><span class="mx-ex">✓</span></td><td><span class="mx-pa">⚠</span></td><td>High</td><td>Low</td><td>Multi-session conversational</td></tr>
+        <tr><td><strong>A-Mem</strong></td><td><span class="mx-ex">✓</span></td><td><span class="mx-pa">⚠</span></td><td>Very Low</td><td>Med</td><td>Personal assistant · copilot</td></tr>
+        <tr><td><strong>Zep</strong></td><td><span class="mx-ex">✓</span></td><td><span class="mx-ex">✓</span></td><td>Med</td><td>Med</td><td>Healthcare · finance · enterprise</td></tr>
+        <tr><td><strong>Memory-R1</strong></td><td><span class="mx-ex">✓</span></td><td><span class="mx-ex">✓</span></td><td>Variable</td><td>High (RL)</td><td>Learned policy deployment</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- PRINCIPLES -->
+<section class="sec" id="principles">
+  <div class="eyebrow">Key Takeaways</div>
+  <h2 class="stitle">Seven Principles for Production Memory Optimization</h2>
+  <div class="principles">
+    <div class="pc"><div class="pc-n">01</div><div><div class="pc-title">No single technique dominates</div><div class="pc-body">RAPTOR, HippoRAG, A-Mem, and Zep solve different structural problems. Production systems compose them with hybrid fusion, not select one.</div></div></div>
+    <div class="pc"><div class="pc-n">02</div><div><div class="pc-title">Cost and accuracy align in correct architecture</div><div class="pc-body">A-Mem's −90% token overhead with +145% ROUGE-L is the clearest evidence. Correctness and efficiency are not in tension.</div></div></div>
+    <div class="pc"><div class="pc-n">03</div><div><div class="pc-title">Memory is a learning mechanism</div><div class="pc-body">Reflexion's +10.9pp HumanEval gain with zero weight updates proves episodic failure memory is production-grade self-improvement.</div></div></div>
+    <div class="pc"><div class="pc-n">04</div><div><div class="pc-title">Temporal validity is underinvested</div><div class="pc-body">Zep's bi-temporal schema is architecturally complete and tooling is maturing. Deploying without it creates invisible stale-data failures.</div></div></div>
+    <div class="pc"><div class="pc-n">05</div><div><div class="pc-title">Design against the Memory-R1 abstraction</div><div class="pc-body">ADD/UPDATE/DELETE/NOOP is the clean interface. Implement as heuristics today; migrate to RL policies when they reach production maturity.</div></div></div>
+    <div class="pc"><div class="pc-n">06</div><div><div class="pc-title">Proactive + reactive hybrid is correct</div><div class="pc-body">Proactive for profiles and active constraints. Reactive tool calls for deep archives. Neither alone is optimal at scale.</div></div></div>
+    <div class="pc"><div class="pc-n">07</div><div><div class="pc-title">All consolidation must be async</div><div class="pc-body">Memory operations in the synchronous hot path degrade latency SLAs and introduce race conditions. Cold path only.</div></div></div>
+  </div>
+</section>
+
+</div>
+
+<footer class="footer-nav">
+  <h3>Next: Production, Security & Evaluation</h3>
+  <p>Healthcare · Finance · Enterprise Patterns · OWASP LLM Top 10 · NIST AI RMF · LongMemEval 5 Abilities</p>
+  <div class="fnav-btns">
+    <a class="fb fb-pri" href="#">Read Part III →</a>
+    <a class="fb fb-sec" href="#">← Part I: The State Layer</a>
+    <a class="fb fb-sec" href="#">← Series Introduction</a>
+  </div>
+</footer>
+
+<script>
+const sections = document.querySelectorAll('.sec');
+const navItems = document.querySelectorAll('.pn-item');
+const io = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      navItems.forEach(n=>n.classList.remove('active'));
+      const id = e.target.getAttribute('id');
+      const a = document.querySelector(`.pn-item[href="#${id}"]`);
+      if(a) a.classList.add('active');
+    }
+  });
+},{threshold:.25});
+sections.forEach(s=>io.observe(s));
+</script>
+</body>
+</html>

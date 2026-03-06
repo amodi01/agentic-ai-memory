@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Memory Architecture: The State Layer — Part I</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0d1117;--ink-s:#3d4451;--ink-m:#6e7787;
+  --bg:#f9f9f7;--sur:#ffffff;--bdr:#e8e8e4;
+  --teal:#0ea5a0;--teal-l:#e0f7f6;--teal-d:#0c7a76;
+  --amber:#d97706;--amber-l:#fef3c7;
+  --indigo:#4f46e5;--indigo-l:#eef2ff;
+  --rose:#e11d48;--rose-l:#fff1f2;
+  --emerald:#059669;--emerald-l:#ecfdf5;
+  --violet:#7c3aed;--violet-l:#f5f3ff;
+  --orange:#ea580c;--orange-l:#fff7ed;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);line-height:1.7;overflow-x:hidden}
+
+/* ── HERO ── */
+.hero{background:linear-gradient(135deg,#0a0f1a 0%,#0f1f35 45%,#0a1628 100%);padding:80px 24px 96px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 55% 45% at 15% 55%,rgba(14,165,160,.2) 0%,transparent 65%),radial-gradient(ellipse 45% 55% at 85% 25%,rgba(79,70,229,.18) 0%,transparent 65%);pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:48px 48px}
+.hero-inner{max-width:880px;margin:0 auto;position:relative;z-index:1}
+.h-breadcrumb{display:flex;align-items:center;gap:10px;margin-bottom:32px;flex-wrap:wrap}
+.bc-pill{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.bc-series{background:rgba(14,165,160,.15);border:1px solid rgba(14,165,160,.35);color:#5eead4}
+.bc-part{background:rgba(79,70,229,.15);border:1px solid rgba(79,70,229,.35);color:#a5b4fc}
+.bc-dot{color:rgba(255,255,255,.2);font-size:14px}
+.bc-pulse{width:7px;height:7px;border-radius:50%;background:#5eead4;animation:bpulse 2s infinite}
+@keyframes bpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(1.5)}}
+.hero h1{font-family:'DM Serif Display',serif;font-size:clamp(34px,5.5vw,60px);line-height:1.1;letter-spacing:-.025em;color:#fff;margin-bottom:8px}
+.hero h1 em{font-style:italic;background:linear-gradient(135deg,#2dd4bf,#0ea5a0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:18px;color:rgba(255,255,255,.6);font-weight:300;max-width:600px;margin-bottom:36px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:44px}
+.htag{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55)}
+.hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;max-width:560px}
+.stat{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:16px 20px;backdrop-filter:blur(8px)}
+.stat-n{font-family:'DM Serif Display',serif;font-size:30px;color:#fff;line-height:1;margin-bottom:3px}
+.stat-l{font-size:11px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em}
+
+/* ── PROGRESS NAV ── */
+.prog-nav{background:var(--sur);border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:100;padding:0 24px}
+.prog-inner{max-width:880px;margin:0 auto;display:flex;gap:0;overflow-x:auto;scrollbar-width:none}
+.prog-inner::-webkit-scrollbar{display:none}
+.pn-item{flex-shrink:0;padding:14px 18px;font-size:12px;font-weight:600;color:var(--ink-m);cursor:pointer;border-bottom:2px solid transparent;transition:.2s;white-space:nowrap;text-decoration:none}
+.pn-item:hover,.pn-item.active{color:var(--teal);border-color:var(--teal)}
+
+/* ── BODY ── */
+.body-w{max-width:880px;margin:0 auto;padding:0 24px 80px}
+
+/* section blocks */
+.sec{padding:60px 0 48px;border-bottom:1px solid var(--bdr)}
+.sec:last-child{border-bottom:none}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin-bottom:18px}
+.eyebrow::after{content:'';display:block;width:28px;height:1px;background:var(--teal);opacity:.4}
+h2.stitle{font-family:'DM Serif Display',serif;font-size:clamp(26px,4vw,38px);line-height:1.15;letter-spacing:-.02em;margin-bottom:18px;color:var(--ink)}
+.lead{font-size:17px;color:var(--ink-s);line-height:1.8;max-width:780px}
+.lead strong{color:var(--ink);font-weight:600}
+.pullq{border-left:3px solid var(--teal);background:var(--teal-l);padding:20px 26px;border-radius:0 12px 12px 0;margin:28px 0;font-size:16px;color:var(--ink-s);font-style:italic}
+.pullq strong{color:var(--ink);font-style:normal}
+
+/* failure cards */
+.fail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:32px}
+.fail-card{background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:26px;position:relative;overflow:hidden;transition:.2s}
+.fail-card:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(0,0,0,.08)}
+.fail-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.fail-card.a::before{background:linear-gradient(90deg,#f59e0b,#d97706)}
+.fail-card.b::before{background:linear-gradient(90deg,#6366f1,#4f46e5)}
+.fail-card.c::before{background:linear-gradient(90deg,#f43f5e,#e11d48)}
+.fc-cls{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
+.fail-card.a .fc-cls{color:var(--amber)}.fail-card.b .fc-cls{color:var(--indigo)}.fail-card.c .fc-cls{color:var(--rose)}
+.fc-badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;margin-bottom:12px}
+.fail-card.a .fc-badge{background:var(--amber-l);color:var(--amber)}
+.fail-card.b .fc-badge{background:var(--indigo-l);color:var(--indigo)}
+.fail-card.c .fc-badge{background:var(--rose-l);color:var(--rose)}
+.fc-title{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:10px;line-height:1.2}
+.fc-body{font-size:14px;color:var(--ink-s);line-height:1.65;margin-bottom:14px}
+.fc-cite{display:flex;gap:8px;background:var(--bg);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--ink-m);line-height:1.5}
+.fc-cite-icon{flex-shrink:0}
+
+/* hot cold */
+.hc-box{margin-top:32px;border:1px solid var(--bdr);border-radius:18px;overflow:hidden;box-shadow:0 6px 28px rgba(0,0,0,.05)}
+.hc-hdr{display:grid;grid-template-columns:1fr 1fr}
+.hc-hot-hdr{background:linear-gradient(135deg,#fff3cd,#ffe980);color:#92400e;padding:14px 22px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.hc-cold-hdr{background:linear-gradient(135deg,#dbeafe,#c7d2fe);color:#1e3a8a;padding:14px 22px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.hc-cols{display:grid;grid-template-columns:1fr 1fr;background:var(--sur)}
+.hc-col{padding:26px}
+.hc-col:first-child{border-right:1px dashed var(--bdr)}
+.step{display:flex;gap:12px;margin-bottom:18px}
+.step:last-child{margin-bottom:0}
+.sn{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px}
+.hc-col.hot .sn{background:#fef3c7;color:#92400e}
+.hc-col.cold .sn{background:#dbeafe;color:#1e3a8a}
+.sl{font-weight:700;font-size:13px;color:var(--ink);margin-bottom:3px}
+.sd{font-size:13px;color:var(--ink-s);line-height:1.55}
+.hc-rule{grid-column:1/-1;background:linear-gradient(90deg,#fffbeb,#fef2f2,#fffbeb);border-top:1px solid #fed7aa;padding:13px 24px;font-size:13px;color:#92400e;font-weight:600;text-align:center}
+
+/* taxonomy */
+.layers{display:flex;flex-direction:column;gap:10px;margin-top:32px}
+.layer{display:grid;grid-template-columns:180px 1fr auto;border:1px solid var(--bdr);border-radius:12px;overflow:hidden;transition:.2s;cursor:pointer}
+.layer:hover{box-shadow:0 4px 20px rgba(0,0,0,.08);transform:translateX(4px)}
+.lnum{padding:18px 20px;display:flex;flex-direction:column;justify-content:center}
+.ln-val{font-family:'DM Serif Display',serif;font-size:28px;line-height:1;margin-bottom:2px}
+.ln-name{font-size:12px;font-weight:600;opacity:.8}
+.lbody{padding:18px 22px;border-left:1px solid var(--bdr);background:var(--sur)}
+.ltech{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-m);margin-bottom:6px}
+.ldesc{font-size:14px;color:var(--ink-s);line-height:1.6}
+.lwarn{font-size:12px;color:#dc2626;background:#fef2f2;border-left:2px solid #dc2626;padding:6px 10px;border-radius:0 6px 6px 0;margin-top:8px}
+.lsev{padding:18px 16px;border-left:1px solid var(--bdr);background:var(--bg);display:flex;align-items:center}
+.sbadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;white-space:nowrap}
+.sev-crit{background:#fef2f2;color:#dc2626}
+.sev-ro{background:#fff7ed;color:#ea580c}
+.sev-dyn{background:#f5f3ff;color:#7c3aed}
+.sev-cur{background:#fefce8;color:#ca8a04}
+.sev-hyb{background:#fdf2f8;color:#9d174d}
+.sev-str{background:#ecfdf5;color:#166534}
+
+/* layer color accents */
+.l0{background:linear-gradient(135deg,#ecfdf5,#d1fae5);color:#065f46}
+.l1{background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1e3a8a}
+.l2{background:linear-gradient(135deg,#f5f3ff,#ede9fe);color:#4c1d95}
+.l3{background:linear-gradient(135deg,#fffbeb,#fef3c7);color:#78350f}
+.l4{background:linear-gradient(135deg,#fff1f2,#ffe4e6);color:#881337}
+.l5{background:linear-gradient(135deg,#fdf4ff,#fae8ff);color:#6b21a8}
+
+/* formula */
+.formula-box{background:var(--ink);border-radius:18px;overflow:hidden;margin-top:32px}
+.fbox-hdr{padding:16px 28px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase}
+.fd{width:10px;height:10px;border-radius:50%}
+.fbox-body{padding:32px 28px}
+.feq{font-family:'JetBrains Mono',monospace;font-size:clamp(12px,2vw,15px);color:#e2e8f0;line-height:2.4;margin-bottom:28px;overflow-x:auto;white-space:nowrap}
+.tc{color:#2dd4bf;font-weight:700}.ta{color:#fbbf24;font-weight:700}.tv{color:#c084fc;font-weight:700}.tr{color:#fb7185;font-weight:700}.tco{color:#64748b}
+.fterms{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.ft{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px 18px}
+.ft-n{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;margin-bottom:5px}
+.ft-d{font-size:12px;color:rgba(255,255,255,.45);line-height:1.6}
+
+/* code block */
+.code-block{background:#0f1923;border-radius:14px;overflow:hidden;margin:24px 0;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.cb-hdr{padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between}
+.cb-dots{display:flex;gap:6px}.cbd{width:10px;height:10px;border-radius:50%}
+.cb-lang{font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,.3);letter-spacing:.06em;text-transform:uppercase}
+.cb-body{padding:22px;overflow-x:auto}
+pre{font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;color:#e2e8f0}
+.kw{color:#c084fc}.fn{color:#60a5fa}.str{color:#86efac}.cmt{color:#475569}.cls{color:#fbbf24}.op{color:#fb7185}
+
+/* bottlenecks */
+.bt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-top:32px}
+.bt{background:var(--sur);border:1px solid var(--bdr);border-radius:13px;padding:22px}
+.bt-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.bt-idx{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--ink-m);letter-spacing:.1em;text-transform:uppercase}
+.sbar{height:4px;border-radius:100px;background:var(--bdr);margin-bottom:12px;overflow:hidden}
+.sf{height:100%;border-radius:100px}
+.s9{width:90%;background:linear-gradient(90deg,#dc2626,#ef4444)}
+.s8{width:80%;background:linear-gradient(90deg,#ea580c,#f97316)}
+.s7{width:70%;background:linear-gradient(90deg,#d97706,#f59e0b)}
+.s6{width:60%;background:linear-gradient(90deg,#ca8a04,#eab308)}
+.bt-title{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:7px}
+.bt-desc{font-size:13px;color:var(--ink-s);line-height:1.6;margin-bottom:10px}
+.bt-fix{font-size:12px;color:var(--emerald);background:var(--emerald-l);border-radius:6px;padding:6px 10px;font-weight:500}
+
+/* papers table */
+.tbl-w{margin-top:32px;border:1px solid var(--bdr);border-radius:14px;overflow:hidden;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+th{padding:11px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-m);background:var(--bg);border-bottom:1px solid var(--bdr);white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid #f3f4f6;color:var(--ink-s);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafafa}
+td:first-child{font-weight:700;color:var(--ink)}
+.rb{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.rb-h{background:#dcfce7;color:#166534}.rb-m{background:#fef9c3;color:#854d0e}.rb-l{background:#fee2e2;color:#991b1b}.rb-e{background:var(--indigo-l);color:var(--indigo);border:1px solid #c7d2fe}
+.vtag{font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 7px;background:var(--bg);border:1px solid var(--bdr);border-radius:4px;color:var(--ink-m)}
+
+/* principles */
+.principles{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:32px}
+.pc{display:flex;gap:16px;padding:22px;background:var(--sur);border:1px solid var(--bdr);border-radius:13px;transition:.2s}
+.pc:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,.07)}
+.pc-n{font-family:'DM Serif Display',serif;font-size:38px;line-height:1;color:#e2e8f0;flex-shrink:0;margin-top:-3px}
+.pc-title{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:5px}
+.pc-body{font-size:13px;color:var(--ink-s);line-height:1.65}
+
+/* refs */
+.refs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:24px}
+.ref-item{display:flex;gap:10px;padding:10px 14px;background:var(--sur);border:1px solid var(--bdr);border-radius:9px;font-size:12px;color:var(--ink-s);line-height:1.5;transition:.15s}
+.ref-item:hover{border-color:var(--teal);background:var(--teal-l)}
+.ref-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--teal);flex-shrink:0;margin-top:1px}
+.ref-item a{color:var(--teal);text-decoration:none;font-weight:600}
+
+/* footer */
+.footer-nav{background:var(--ink);padding:56px 24px;text-align:center}
+.footer-nav h3{font-family:'DM Serif Display',serif;font-size:30px;color:#fff;margin-bottom:10px}
+.footer-nav p{color:rgba(255,255,255,.5);font-size:15px;margin-bottom:28px}
+.fnav-btns{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+.fb{display:inline-flex;align-items:center;gap:7px;padding:12px 24px;border-radius:9px;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;border:none;transition:.15s}
+.fb:hover{opacity:.88;transform:translateY(-1px)}
+.fb-pri{background:var(--teal);color:#fff}
+.fb-sec{background:rgba(255,255,255,.09);color:#fff;border:1px solid rgba(255,255,255,.18)}
+
+/* accordion for sections */
+.acc-content{overflow:hidden;transition:max-height .35s ease}
+
+/* tooltip */
+[data-tip]{position:relative;cursor:help}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;font-size:11px;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:200;pointer-events:none;font-family:'DM Sans',sans-serif;font-style:normal}
+
+@media(max-width:640px){
+  .hc-cols,.hc-hdr{grid-template-columns:1fr}
+  .hc-col:first-child{border-right:none;border-bottom:1px dashed var(--bdr)}
+  .layer{grid-template-columns:1fr}
+  .lsev{border-left:none;border-top:1px solid var(--bdr)}
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="h-breadcrumb">
+      <span class="bc-pill bc-series"><span class="bc-pulse"></span>Agentic AI Memory Series</span>
+      <span class="bc-dot">›</span>
+      <span class="bc-pill bc-part">Part I of III</span>
+    </div>
+    <h1>Agent Memory Architecture:<br><em>The State Layer</em></h1>
+    <p class="hero-sub">A Research-to-Implementation Blueprint for Senior Engineers and AI Architects</p>
+    <div class="hero-tags">
+      <span class="htag">Context Engineering</span>
+      <span class="htag">Six-Layer Taxonomy</span>
+      <span class="htag">Hot / Cold Path</span>
+      <span class="htag">Extract → Consolidate</span>
+      <span class="htag">NeurIPS · ICML · ICLR · ACL</span>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-n">~24</div><div class="stat-l">Min Read</div></div>
+      <div class="stat"><div class="stat-n">50+</div><div class="stat-l">Citations</div></div>
+      <div class="stat"><div class="stat-n">6</div><div class="stat-l">Memory Layers</div></div>
+      <div class="stat"><div class="stat-n">7</div><div class="stat-l">Bottlenecks</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- STICKY NAV -->
+<nav class="prog-nav">
+  <div class="prog-inner">
+    <a class="pn-item active" href="#exec">Overview</a>
+    <a class="pn-item" href="#problem">The Problem</a>
+    <a class="pn-item" href="#hotcold">Hot/Cold Path</a>
+    <a class="pn-item" href="#taxonomy">6-Layer Taxonomy</a>
+    <a class="pn-item" href="#formula">Retrieval Formula</a>
+    <a class="pn-item" href="#pipeline">ETL Pipeline</a>
+    <a class="pn-item" href="#bottlenecks">Bottlenecks</a>
+    <a class="pn-item" href="#papers">Research Papers</a>
+    <a class="pn-item" href="#principles">Principles</a>
+  </div>
+</nav>
+
+<div class="body-w">
+
+<!-- EXEC SUMMARY -->
+<section class="sec" id="exec">
+  <div class="eyebrow">Executive Summary</div>
+  <h2 class="stitle">Memory Is the State Layer That Makes LLMs Production-Ready</h2>
+  <p class="lead">Agent memory is no longer an enhancement layer — it is the foundational <strong>state management infrastructure</strong> that transforms inherently stateless LLM inference into reliable, long-lived agentic systems. The latest production engineering guidance frames this challenge as <strong>context engineering</strong>: dynamically assembling the complete inference payload on every turn while maintaining rigorous controls over token budget, retrieval latency, source trust, and governance.</p>
+  <div class="pullq"><strong>The modern reframe:</strong> Context is now a production data pipeline — with a hot path (context assembly) and a cold path (extraction, consolidation, pruning, provenance). Stateful AI is a distributed systems problem, not a better prompt. — Milam & Gulli, Context Engineering: Sessions, Memory (2024)</div>
+  <p class="lead">This article synthesizes primary research from NeurIPS, ICML, ICLR, and ACL with production documentation into a practitioner-grade blueprint. The goal: memory systems that are simultaneously <strong>accurate, cost-controlled, secure, and evaluable</strong> at scale.</p>
+</section>
+
+<!-- THE PROBLEM -->
+<section class="sec" id="problem">
+  <div class="eyebrow">Section 1 · The Architectural Problem</div>
+  <h2 class="stitle">LLM Statelessness: Three Classes of Production Failure</h2>
+  <p class="lead">Every production LLM deployment operates under a fundamental constraint: <strong>inference calls are stateless.</strong> Outside of pretraining weights, an LLM's awareness is bounded entirely by a single context window. This produces three measurable failure categories at scale.</p>
+  <div class="fail-grid">
+    <div class="fail-card a">
+      <div class="fc-cls">Class A</div>
+      <div class="fc-badge">Context Overflow</div>
+      <div class="fc-title">Lost in the Middle</div>
+      <div class="fc-body">Long-running tasks accumulate tokens until early-context constraints fall into the "lost in the middle" degradation zone. The agent completes the wrong objective — no error raised, output appears correct.</div>
+      <div class="fc-cite"><span class="fc-cite-icon">📄</span><span>Liu et al. (TACL 2024): performance degrades for facts in middle-context positions — even within the nominal window. Positional attention problem, not window-size problem.</span></div>
+    </div>
+    <div class="fail-card b">
+      <div class="fc-cls">Class B</div>
+      <div class="fc-badge">Cross-Session Amnesia</div>
+      <div class="fc-title">No Persistent State</div>
+      <div class="fc-body">No persistence mechanism exists between inference sessions without explicit external state storage. User preferences, architectural decisions, and constraints must be re-established at every session boundary.</div>
+      <div class="fc-cite"><span class="fc-cite-icon">📊</span><span>Quantified cost: token overhead per re-establishment + latency increase + cumulative trust erosion — all compounding at production query volumes.</span></div>
+    </div>
+    <div class="fail-card c">
+      <div class="fc-cls">Class C</div>
+      <div class="fc-badge">Knowledge Fragmentation</div>
+      <div class="fc-title">Multi-Hop Blindness</div>
+      <div class="fc-body">Multi-tool outputs cannot be associated without a memory layer connecting independently retrieved facts. Multi-hop relational queries fail silently — standard RAG cannot resolve entity chains structurally.</div>
+      <div class="fc-cite"><span class="fc-cite-icon">🔗</span><span>"Does Sarah require CFO approval for the March milestone?" requires joining three independently retrieved facts. Impossible without a KG layer.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOT COLD PATH -->
+<section class="sec" id="hotcold">
+  <div class="eyebrow">Section 2 · Core Architecture Pattern</div>
+  <h2 class="stitle">The Hot Path / Cold Path Separation</h2>
+  <p class="lead">The single most critical architectural decision in any production memory system. Conflating synchronous and asynchronous operations corrupts both latency SLAs and memory state integrity. All extraction, consolidation, and governance must live in the cold path.</p>
+  <div class="hc-box">
+    <div class="hc-hdr">
+      <div class="hc-hot-hdr">🔥 Hot Path — Blocking · Synchronous · &lt;200ms SLA</div>
+      <div class="hc-cold-hdr">🧊 Cold Path — Async Background Queue</div>
+    </div>
+    <div class="hc-cols">
+      <div class="hc-col hot">
+        <div class="step"><div class="sn">1</div><div><div class="sl">FETCH</div><div class="sd">Load session events, user profile, top-k memories, RAG docs — in parallel</div></div></div>
+        <div class="step"><div class="sn">2</div><div><div class="sl">PREPARE</div><div class="sd">Assemble context, enforce token budget, apply priority order, trust-gate injection</div></div></div>
+        <div class="step"><div class="sn">3</div><div><div class="sl">INVOKE</div><div class="sd">LLM inference with iterative tool calls</div></div></div>
+        <div class="step"><div class="sn">4</div><div><div class="sl">RETURN + ENQUEUE</div><div class="sd">Deliver response to user. Enqueue turn events for cold path.</div></div></div>
+      </div>
+      <div class="hc-col cold">
+        <div class="step"><div class="sn">5</div><div><div class="sl">UPLOAD</div><div class="sd">Append turn events to session store (async)</div></div></div>
+        <div class="step"><div class="sn">6</div><div><div class="sl">EXTRACT</div><div class="sd">Topic-gated LLM extraction with schema-validated structured output</div></div></div>
+        <div class="step"><div class="sn">7</div><div><div class="sl">CONSOLIDATE</div><div class="sd">CREATE / UPDATE / DELETE ops, transactional apply, dedup + contradiction resolution</div></div></div>
+        <div class="step"><div class="sn">8</div><div><div class="sl">GOVERN</div><div class="sd">TTL enforcement, PII sweep, audit log, deletion compliance</div></div></div>
+      </div>
+    </div>
+    <div class="hc-rule">⚠️ INVARIANT: Steps 6–8 must NEVER execute synchronously in the hot path — async queue only (Redis Streams / Kafka / Celery)</div>
+  </div>
+</section>
+
+<!-- TAXONOMY -->
+<section class="sec" id="taxonomy">
+  <div class="eyebrow">Section 3 · Memory Taxonomy</div>
+  <h2 class="stitle">Six-Layer Memory Architecture</h2>
+  <p class="lead">Each layer has a distinct substrate, cost profile, failure mode, and governance requirement. Conflating layers is the most common production architecture error. Click any layer to explore.</p>
+  <div class="layers" id="layer-stack">
+    <div class="layer" onclick="toggleLayer(this)">
+      <div class="lnum l0"><div class="ln-val">L1</div><div class="ln-name">In-Context</div></div>
+      <div class="lbody">
+        <div class="ltech">GPU HBM · Transformer Self-Attention · 4K–200K tokens</div>
+        <div class="ldesc">Maximum fidelity. Single inference call only. Highest per-token cost across the stack. FlashAttention (Dao et al., 2022) + vLLM (Kwon et al., 2023) required at scale.</div>
+        <div class="lwarn">⚠ "Lost in the Middle" — positional recall degrades for middle-context facts. Compaction is a correctness requirement (Liu et al., TACL 2024).</div>
+      </div>
+      <div class="lsev"><div class="sbadge sev-crit">Critical</div></div>
+    </div>
+    <div class="layer" onclick="toggleLayer(this)">
+      <div class="lnum l1"><div class="ln-val">L2</div><div class="ln-name">Parametric</div></div>
+      <div class="lbody">
+        <div class="ltech">Neural Network Weights · Pretraining · Billions of parameters</div>
+        <div class="ldesc">Knowledge frozen at training time. No targeted update path. Fine-tuning causes catastrophic forgetting (Kirkpatrick et al., 2017 — EWC). RAG exists to move time-sensitive knowledge OUT of weights.</div>
+      </div>
+      <div class="lsev"><div class="sbadge sev-ro">Read-Only</div></div>
+    </div>
+    <div class="layer" onclick="toggleLayer(this)">
+      <div class="lnum l2"><div class="ln-val">L3</div><div class="ln-name">Episodic</div></div>
+      <div class="lbody">
+        <div class="ltech">PostgreSQL + Vector Index · Time-stamped events · Redis hot cache</div>
+        <div class="ldesc">Specific past interactions with temporal metadata. Uses the 4-factor hybrid score. Importance cached at write time to avoid per-query LLM cost. Park et al. Generative Agents (2023) established the foundational retrieval pattern.</div>
+      </div>
+      <div class="lsev"><div class="sbadge sev-dyn">Dynamic</div></div>
+    </div>
+    <div class="layer" onclick="toggleLayer(this)">
+      <div class="lnum l3"><div class="ln-val">L4</div><div class="ln-name">Semantic</div></div>
+      <div class="lbody">
+        <div class="ltech">Vector DB + Structured K/V · Distilled facts + user profiles</div>
+        <div class="ldesc">Distilled, decontextualized facts. Three forms: atomic text collection, structured user profile, or rolling summary document. Three compaction strategies: sliding window · rolling summary · state extraction.</div>
+        <div class="lwarn">⚠ Compression-fidelity tradeoff: "Python for ML only" → "Prefers Python" — silent qualifier loss produces wrong recommendations.</div>
+      </div>
+      <div class="lsev"><div class="sbadge sev-cur">Curated</div></div>
+    </div>
+    <div class="layer" onclick="toggleLayer(this)">
+      <div class="lnum l4"><div class="ln-val">L5</div><div class="ln-name">Vector ANN</div></div>
+      <div class="lbody">
+        <div class="ltech">HNSW (Malkov & Yashunin, 2018) · FAISS (Johnson et al., 2017) · Dense embeddings</div>
+        <div class="ldesc">Returns semantically SIMILAR content — NOT logically RELEVANT content. This distinction causes silent production failures. Requires hybrid retrieval: dense + BM25 + KG + cross-encoder reranking.</div>
+      </div>
+      <div class="lsev"><div class="sbadge sev-hyb">Hybrid Req.</div></div>
+    </div>
+    <div class="layer" onclick="toggleLayer(this)">
+      <div class="lnum l5"><div class="ln-val">L6</div><div class="ln-name">KG Memory</div></div>
+      <div class="lbody">
+        <div class="ltech">Neo4j / FalkorDB / Amazon Neptune · Entity nodes + typed edges</div>
+        <div class="ldesc">Resolves multi-hop relational queries that vector search cannot structurally address. Required for entity-chain queries ("Sarah → leads → Project → budget → CFO approval"). Expensive to build and maintain at scale.</div>
+      </div>
+      <div class="lsev"><div class="sbadge sev-str">Structured</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- RETRIEVAL FORMULA -->
+<section class="sec" id="formula">
+  <div class="eyebrow">Section 4 · Retrieval Scoring</div>
+  <h2 class="stitle">The Four-Factor Production Retrieval Formula</h2>
+  <p class="lead">Cosine similarity alone fails at production scale. The four-factor formula — derived from Generative Agents (Park et al., 2023) and extended by production documentation — is the current standard for hybrid memory retrieval ranking.</p>
+  <div class="formula-box">
+    <div class="fbox-hdr"><div class="fd" style="background:#ff5f57"></div><div class="fd" style="background:#febc2e"></div><div class="fd" style="background:#28c840"></div>&nbsp; retrieval-score.formula — production standard</div>
+    <div class="fbox-body">
+      <div class="feq">score(m, q) = <span class="tco">α</span> · <span class="tc">sim(q, m)</span> + <span class="tco">β</span> · <span class="ta">recency(m)</span> + <span class="tco">γ</span> · <span class="tv">importance(m)</span> + <span class="tco">δ</span> · <span class="tr">trust(m)</span></div>
+      <div class="fterms">
+        <div class="ft"><div class="ft-n" style="color:#2dd4bf">sim(q, m)</div><div class="ft-d">cosine_similarity(embed(q), embed(m)). "About the same topic." Semantic retrieval foundation. Fails alone on multi-hop queries.</div></div>
+        <div class="ft"><div class="ft-n" style="color:#fbbf24">recency(m)</div><div class="ft-d">0.99 ^ hours_since_creation. Exponential decay. Fixes the "stale preference" problem — yesterday's preferences outrank last year's.</div></div>
+        <div class="ft"><div class="ft-n" style="color:#c084fc">importance(m)</div><div class="ft-d">LLM score 1–10, cached at write time (not per-query). Ensures critical constraints surface over low-stakes remarks.</div></div>
+        <div class="ft"><div class="ft-n" style="color:#fb7185">trust(m)</div><div class="ft-d">Source provenance weight: 0.90 (explicit user) → 0.70 (inferred) → 0.30 (unverified). Non-optional in any production deployment.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ETL PIPELINE -->
+<section class="sec" id="pipeline">
+  <div class="eyebrow">Section 5 · Memory ETL Pipeline</div>
+  <h2 class="stitle">Extract → Consolidate: The Production Pipeline</h2>
+  <p class="lead">A production memory system must not store everything. The core pattern is <strong>topic-gated extraction</strong> followed by <strong>transactional consolidation</strong>. Together they transform a raw event log into a curated knowledge base.</p>
+
+  <div class="code-block">
+    <div class="cb-hdr"><div class="cb-dots"><div class="cbd" style="background:#ff5f57"></div><div class="cbd" style="background:#febc2e"></div><div class="cbd" style="background:#28c840"></div></div><div class="cb-lang">Python · Extractor</div></div>
+    <div class="cb-body"><pre><span class="kw">def</span> <span class="fn">extract_memories</span>(events, topics, schema<span class="op">=</span><span class="kw">None</span>):
+    <span class="str">"""
+    events: list of (role, content, tool_calls, timestamps)
+    topics: enumerated memory topics ("preferences", "project_context")
+    Critical: drop anything that doesn't match allowed topics/fields.
+    Precision over recall — junk drawer is worse than sparse memory.
+    """</span>
+    prompt <span class="op">=</span> build_extraction_prompt(events, topics, schema)
+    extracted <span class="op">=</span> llm_structured_output(prompt, schema<span class="op">=</span>schema)
+    <span class="kw">return</span> [m <span class="kw">for</span> m <span class="kw">in</span> extracted <span class="kw">if</span> m[<span class="str">"topic"</span>] <span class="kw">in</span> topics]</pre></div>
+  </div>
+
+  <div class="code-block">
+    <div class="cb-hdr"><div class="cb-dots"><div class="cbd" style="background:#ff5f57"></div><div class="cbd" style="background:#febc2e"></div><div class="cbd" style="background:#28c840"></div></div><div class="cb-lang">Python · Consolidator</div></div>
+    <div class="cb-body"><pre><span class="kw">def</span> <span class="fn">consolidate</span>(scope, extracted_facts):
+    <span class="str">"""
+    Compare newly extracted facts against existing memories.
+    Apply CREATE / UPDATE / DELETE to avoid duplicates and contradictions.
+    This is the architectural differentiator — append-only = junk drawer.
+    """</span>
+    existing <span class="op">=</span> memory_store.get_by_scope(scope)
+    candidates <span class="op">=</span> retrieve_similar(existing, extracted_facts)
+    plan <span class="op">=</span> llm_make_consolidation_plan(existing<span class="op">=</span>candidates, new<span class="op">=</span>extracted_facts)
+
+    <span class="kw">with</span> memory_store.transaction(scope):
+        <span class="kw">for</span> op <span class="kw">in</span> plan:
+            <span class="kw">if</span> op[<span class="str">"type"</span>] <span class="op">==</span> <span class="str">"CREATE"</span>:
+                memory_store.insert(scope, op[<span class="str">"fact"</span>], metadata<span class="op">=</span>op.get(<span class="str">"meta"</span>, {}))
+            <span class="kw">elif</span> op[<span class="str">"type"</span>] <span class="op">==</span> <span class="str">"UPDATE"</span>:
+                memory_store.update(scope, op[<span class="str">"id"</span>], op[<span class="str">"fact"</span>])
+            <span class="kw">elif</span> op[<span class="str">"type"</span>] <span class="op">==</span> <span class="str">"DELETE"</span>:
+                memory_store.delete(scope, op[<span class="str">"id"</span>])</pre></div>
+  </div>
+</section>
+
+<!-- BOTTLENECKS -->
+<section class="sec" id="bottlenecks">
+  <div class="eyebrow">Section 6 · Production Bottlenecks</div>
+  <h2 class="stitle">Seven Bottlenecks With Severity Ratings</h2>
+  <p class="lead">Documented from production deployments. Each maps to a specific architecture control with a validated mitigation path.</p>
+  <div class="bt-grid">
+    <div class="bt"><div class="sbar"><div class="sf s9"></div></div><div class="bt-top"><div class="bt-idx">#1 · 9/10</div></div><div class="bt-title">Context Overflow + Lost in the Middle</div><div class="bt-desc">Long-running tasks truncate early constraints. Mid-context facts fail to surface. Agent produces wrong output with no error signal.</div><div class="bt-fix">✓ State extraction compaction + MemGPT paging</div></div>
+    <div class="bt"><div class="sbar"><div class="sf s8"></div></div><div class="bt-top"><div class="bt-idx">#2 · 8/10</div></div><div class="bt-title">Retrieval Precision Collapse</div><div class="bt-desc">As corpus grows, semantically-similar-but-wrong chunks win the ANN race. Agent answers confidently from wrong source.</div><div class="bt-fix">✓ Hybrid retrieval (dense + BM25 + graph) + cross-encoder reranking</div></div>
+    <div class="bt"><div class="sbar"><div class="sf s8"></div></div><div class="bt-top"><div class="bt-idx">#3 · 8/10</div></div><div class="bt-title">Memory Staleness</div><div class="bt-desc">Facts stored months ago served with identical confidence as today's facts. No temporal validity differentiation in retrieval ranking.</div><div class="bt-fix">✓ Zep bi-temporal graphs + trust decay scoring</div></div>
+    <div class="bt"><div class="sbar"><div class="sf s7"></div></div><div class="bt-top"><div class="bt-idx">#4 · 7/10</div></div><div class="bt-title">Consolidation Drift</div><div class="bt-desc">Episodic → semantic compression drops qualifiers. "Python for ML only" → "Python preferred." Wrong recommendations at inference.</div><div class="bt-fix">✓ Constraint-preserving schema + source citation chain</div></div>
+    <div class="bt"><div class="sbar"><div class="sf s9"></div></div><div class="bt-top"><div class="bt-idx">#5 · 9/10</div></div><div class="bt-title">Memory Hallucination</div><div class="bt-desc">LLMs confabulate memories that were never stored. "As we discussed last session..." — no such session exists. Nelson et al. (2024) quantified this.</div><div class="bt-fix">✓ Source validation + confidence thresholding</div></div>
+    <div class="bt"><div class="sbar"><div class="sf s6"></div></div><div class="bt-top"><div class="bt-idx">#6 · 6/10</div></div><div class="bt-title">Synchronous Write Latency</div><div class="bt-desc">Embedding + indexing executed synchronously during inference. Adds 300–500ms per response. User-perceptible at scale.</div><div class="bt-fix">✓ All memory writes via async queue — cold path only</div></div>
+    <div class="bt"><div class="sbar"><div class="sf s7"></div></div><div class="bt-top"><div class="bt-idx">#7 · 7/10</div></div><div class="bt-title">Consolidation Race Conditions</div><div class="bt-desc">Concurrent writes to same user scope without isolation produces corrupted or contradictory memory state silently.</div><div class="bt-fix">✓ Transactional writes or optimistic concurrency + versioning</div></div>
+  </div>
+</section>
+
+<!-- PAPERS TABLE -->
+<section class="sec" id="papers">
+  <div class="eyebrow">Section 7 · Research Paper Map</div>
+  <h2 class="stitle">Comparative Table: Papers That Drive Architecture Decisions</h2>
+  <div class="tbl-w">
+    <table>
+      <thead><tr><th>Paper</th><th>Venue</th><th>Year</th><th>Core Technique</th><th>Production Readiness</th></tr></thead>
+      <tbody>
+        <tr><td>Memory Networks</td><td><span class="vtag">arXiv</span></td><td>2014</td><td>Read/write memory + inference pipeline for QA</td><td><span class="rb rb-l">Low</span></td></tr>
+        <tr><td>End-to-End Memory Nets</td><td><span class="vtag">NeurIPS</span></td><td>2015</td><td>Multi-hop attention over memory, end-to-end</td><td><span class="rb rb-l">Low/Med</span></td></tr>
+        <tr><td>DNC</td><td><span class="vtag">Nature</span></td><td>2016</td><td>Neural controller + differentiable RAM matrix</td><td><span class="rb rb-l">Low</span></td></tr>
+        <tr><td>Transformer-XL</td><td><span class="vtag">ACL</span></td><td>2019</td><td>Segment-level recurrence + positional encoding</td><td><span class="rb rb-m">Medium</span></td></tr>
+        <tr><td>kNN-LM</td><td><span class="vtag">ICLR</span></td><td>2020</td><td>Interpolate LM with kNN over embedding datastore</td><td><span class="rb rb-m">Medium</span></td></tr>
+        <tr><td>RAG</td><td><span class="vtag">NeurIPS</span></td><td>2020</td><td>Dense index + retriever + generator</td><td><span class="rb rb-h">High</span></td></tr>
+        <tr><td>RETRO</td><td><span class="vtag">ICML</span></td><td>2022</td><td>Chunk retrieval + cross-attention at trillion-token scale</td><td><span class="rb rb-m">Med/High</span></td></tr>
+        <tr><td>Generative Agents</td><td><span class="vtag">arXiv</span></td><td>2023</td><td>Memory stream + reflection + recency/importance retrieval</td><td><span class="rb rb-m">Medium</span></td></tr>
+        <tr><td>MemGPT</td><td><span class="vtag">arXiv</span></td><td>2023</td><td>OS-inspired virtual context management + paging</td><td><span class="rb rb-m">Medium</span></td></tr>
+        <tr><td>LongMemEval</td><td><span class="vtag">ICLR 2025</span></td><td>2025</td><td>5-ability evaluation decomposition + optimizations</td><td><span class="rb rb-h">High</span></td></tr>
+        <tr><td><strong>Memory-R1</strong></td><td><span class="vtag">arXiv 2025</span></td><td>2025</td><td>RL-trained ADD/UPDATE/DELETE/NOOP memory policy</td><td><span class="rb rb-e">Emerging 🆕</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- PRINCIPLES -->
+<section class="sec" id="principles">
+  <div class="eyebrow">Section 8 · Key Takeaways</div>
+  <h2 class="stitle">Seven Principles for Senior Engineers</h2>
+  <div class="principles">
+    <div class="pc"><div class="pc-n">01</div><div><div class="pc-title">Memory is a six-layer control system</div><div class="pc-body">Each layer has distinct substrates, cost profiles, and failure modes. Conflating them is the most common production architecture error.</div></div></div>
+    <div class="pc"><div class="pc-n">02</div><div><div class="pc-title">Hot/cold separation is a correctness property</div><div class="pc-body">Not a performance optimization. Memory writes in the hot path corrupt latency SLAs and introduce race conditions.</div></div></div>
+    <div class="pc"><div class="pc-n">03</div><div><div class="pc-title">Four-factor formula is the production standard</div><div class="pc-body">Similarity + recency + importance + trust. Trust is non-negotiable without it, poisoned memories rank identically to verified data.</div></div></div>
+    <div class="pc"><div class="pc-n">04</div><div><div class="pc-title">Consolidation transforms logs into knowledge</div><div class="pc-body">Append-only memory degrades into a contradiction junk drawer within weeks. Transactional CREATE/UPDATE/DELETE is the differentiator.</div></div></div>
+    <div class="pc"><div class="pc-n">05</div><div><div class="pc-title">Compaction is about correctness, not cost</div><div class="pc-body">Liu et al. (TACL 2024): positional degradation is empirically measured. State extraction compaction is required for reliable long-horizon execution.</div></div></div>
+    <div class="pc"><div class="pc-n">06</div><div><div class="pc-title">RAG and memory are complementary layers</div><div class="pc-body">RAG = shared org truth. Memory = private user context. Production systems deploy both with distinct retrieval paths and injection authority levels.</div></div></div>
+    <div class="pc"><div class="pc-n">07</div><div><div class="pc-title">LongMemEval makes "memory works" measurable</div><div class="pc-body">Five testable abilities, each mapping to a specific engineering component. Systematic debugging instead of opaque "memory doesn't work" complaints.</div></div></div>
+  </div>
+</section>
+
+</div><!-- /body-w -->
+
+<footer class="footer-nav">
+  <h3>Next: Seven Optimization Algorithms</h3>
+  <p>RAPTOR · HippoRAG · Reflexion · MemGPT · A-Mem · Zep · Memory-R1 RL Policy</p>
+  <div class="fnav-btns">
+    <a class="fb fb-pri" href="#">Read Part II →</a>
+    <a class="fb fb-sec" href="#">Part III: Production & Security</a>
+    <a class="fb fb-sec" href="#">← Series Introduction</a>
+  </div>
+</footer>
+
+<script>
+// sticky nav active state
+const sections = document.querySelectorAll('.sec');
+const navItems = document.querySelectorAll('.pn-item');
+const io = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      navItems.forEach(n=>n.classList.remove('active'));
+      const id = e.target.getAttribute('id');
+      const active = document.querySelector(`.pn-item[href="#${id}"]`);
+      if(active) active.classList.add('active');
+    }
+  });
+},{threshold:.3});
+sections.forEach(s=>io.observe(s));
+
+// layer hover pulse
+function toggleLayer(el){
+  el.style.background = el.style.background ? '' : 'rgba(14,165,160,.03)';
+}
+</script>
+</body>
+</html>
